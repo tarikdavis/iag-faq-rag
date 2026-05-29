@@ -14,7 +14,9 @@ services:
   - type: web
     name: iag-faq-rag-demo
     runtime: python
-    rootDir: rag-pipeline
+    # rootDir intentionally omitted — repo root IS the rag-pipeline project.
+    # If you push the full multi-folder workspace instead, add:
+    #   rootDir: rag-pipeline
     # Build phase:
     #   1. install Python deps
     #   2. build the FAQ index by fetching from Contentful CDA
