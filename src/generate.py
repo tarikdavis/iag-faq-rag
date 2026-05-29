@@ -109,6 +109,11 @@ class GenerationResult:
     input_tokens: int = 0
     output_tokens: int = 0
     user_message: str = ""  # the assembled user prompt (for audit log)
+    # Multi-turn additions: when this generation came from a chat turn, we
+    # record the rewritten retrieval query (if any) so the audit log shows
+    # what we actually searched for, not just what the user typed.
+    retrieval_query: str = ""
+    was_rewritten: bool = False
 
 
 _client: Anthropic | None = None
@@ -119,6 +124,61 @@ def _get_client() -> Anthropic:
     if _client is None:
         _client = Anthropic()
     return _client
+
+
+# -----------------------------------------------------------------------------
+# Query rewriting for multi-turn follow-ups.
+#
+# When the user says 'what about for Aer Lingus?', the literal message isn't
+# a useful retrieval query — it has no nouns to match against. We use Haiku
+# to rewrite the latest message as a standalone search query, resolving
+# pronouns and bringing in context from prior turns.
+#
+# Only fires when there ARE prior turns. First-turn questions are passed
+# through unchanged — no rewrite needed and saves an API call.
+# -----------------------------------------------------------------------------
+
+REWRITE_PROMPT = """Given this conversation, rewrite the LAST user message as a standalone, self-contained search query suitable for retrieval against an FAQ corpus. Resolve all pronouns and implied context. Be concise. Return ONLY the rewritten query — no quotes, no explanation, no prefix.
+
+Conversation:
+{conversation}
+
+Rewritten standalone query:"""
+
+
+def rewrite_query_for_retrieval(history: list[dict[str, str]]) -> str:
+    """
+    Given a list of {role, content} messages, return a standalone search
+    query for the latest user message. If there's no prior context (first
+    user message), return the message verbatim.
+
+    history is in chronological order, ending with a user message.
+    """
+    user_msgs = [m for m in history if m.get("role") == "user"]
+    if not user_msgs:
+        return ""
+    latest = user_msgs[-1]["content"]
+    if len(history) <= 1:
+        return latest  # first turn, no rewrite needed
+
+    convo_lines = []
+    for m in history:
+        role = "User" if m.get("role") == "user" else "Assistant"
+        convo_lines.append(f"{role}: {m.get('content', '')}")
+    convo = "\n".join(convo_lines)
+
+    try:
+        resp = _get_client().messages.create(
+            model=MODEL_ID,
+            max_tokens=200,
+            messages=[{"role": "user", "content": REWRITE_PROMPT.format(conversation=convo)}],
+        )
+        rewritten = resp.content[0].text.strip().strip('"').strip("'").strip()
+        return rewritten or latest
+    except Exception:
+        # If rewrite fails, fall back to the original message — better to
+        # retrieve on a noisy query than to fail the request.
+        return latest
 
 
 def build_user_message(question: str, results: list[RetrievalResult]) -> str:
@@ -166,7 +226,7 @@ def _extract_citations(answer: str) -> list[str]:
 
 
 def generate(question: str, results: list[RetrievalResult]) -> GenerationResult:
-    """Run the full retrieve → prompt → Claude → parse pipeline."""
+    """Single-turn version — kept for the CLI (ask.py) which is one-shot."""
     user_message = build_user_message(question, results)
     response = _get_client().messages.create(
         model=MODEL_ID,
@@ -182,4 +242,54 @@ def generate(question: str, results: list[RetrievalResult]) -> GenerationResult:
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,
         user_message=user_message,
+        retrieval_query=question,
+        was_rewritten=False,
+    )
+
+
+def generate_chat(
+    history: list[dict[str, str]],
+    results: list[RetrievalResult],
+    retrieval_query: str,
+    was_rewritten: bool,
+) -> GenerationResult:
+    """
+    Multi-turn version. Receives the full conversation history (alternating
+    user/assistant messages, ending in the user message we just received),
+    plus the retrieval results for that latest message.
+
+    Strategy: pass prior turns as message history to Claude, then append a
+    user message that wraps the retrieved chunks around the latest question.
+    Claude treats the chunks as fresh context for the new question while
+    still remembering the conversation.
+    """
+    if not history or history[-1].get("role") != "user":
+        raise ValueError("history must end with a user message")
+    latest_question = history[-1]["content"]
+    prior = history[:-1]
+
+    # Wrap chunks around the latest question
+    user_message_with_chunks = build_user_message(latest_question, results)
+
+    # Build the messages array sent to Claude. Prior turns pass through
+    # verbatim (the model "remembers" the conversation). The latest user
+    # turn carries the freshly retrieved chunks.
+    messages = list(prior) + [{"role": "user", "content": user_message_with_chunks}]
+
+    response = _get_client().messages.create(
+        model=MODEL_ID,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM_PROMPT,
+        messages=messages,
+    )
+    answer_text = response.content[0].text if response.content else ""
+    return GenerationResult(
+        answer=answer_text,
+        cited_sources=_extract_citations(answer_text),
+        model=MODEL_ID,
+        input_tokens=response.usage.input_tokens,
+        output_tokens=response.usage.output_tokens,
+        user_message=user_message_with_chunks,
+        retrieval_query=retrieval_query,
+        was_rewritten=was_rewritten,
     )

@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from flask import Flask, jsonify, make_response, redirect, request, send_from_directory
 
-from src.generate import build_user_message, generate
+from src.generate import build_user_message, generate, generate_chat, rewrite_query_for_retrieval
 from src.log_query import log_query
 from src.retrieve import RetrievalResult, _get_collection, retrieve
 
@@ -296,6 +296,112 @@ def create_app() -> Flask:
             "edge_count": len(edges),
             "nodes": nodes,
             "edges": edges,
+        })
+
+    @app.post("/api/chat")
+    def api_chat():
+        """
+        Multi-turn chat endpoint.
+
+        Body:
+          {
+            "messages": [
+              {"role": "user", "content": "..."},
+              {"role": "assistant", "content": "..."},
+              ...
+              {"role": "user", "content": "..."}  // latest
+            ],
+            "locale": "en-GB" | "es-ES",
+            "opco": "british-airways" | "aer-lingus" | "iberia" | null
+          }
+
+        For follow-up turns we ask Claude to rewrite the latest message as
+        a standalone retrieval query (so 'what about for Aer?' gets enough
+        context to retrieve). First-turn queries pass through unchanged.
+        """
+        payload = request.get_json(silent=True) or {}
+        messages = payload.get("messages") or []
+        locale: str = payload.get("locale") or "en-GB"
+        opco: str | None = payload.get("opco") or None
+        if opco in ("", "all"):
+            opco = None
+
+        if not isinstance(messages, list) or not messages:
+            return jsonify({"error": "messages array is required"}), 400
+        if messages[-1].get("role") != "user":
+            return jsonify({"error": "last message must be from user"}), 400
+        latest_user_msg = (messages[-1].get("content") or "").strip()
+        if not latest_user_msg:
+            return jsonify({"error": "latest user message is empty"}), 400
+        if locale not in ("en-GB", "es-ES"):
+            return jsonify({"error": f"unsupported locale: {locale}"}), 400
+        if opco not in (None, "british-airways", "aer-lingus", "iberia"):
+            return jsonify({"error": f"unknown opco: {opco}"}), 400
+
+        # Step 1: figure out the retrieval query.
+        # First turn → use the message verbatim. Follow-ups → rewrite via Haiku.
+        is_followup = len(messages) > 1
+        if is_followup:
+            retrieval_query = rewrite_query_for_retrieval(messages)
+            was_rewritten = (retrieval_query.strip() != latest_user_msg)
+        else:
+            retrieval_query = latest_user_msg
+            was_rewritten = False
+
+        # Step 2: bump k for listing-shaped queries (uses the rewritten query)
+        k = LISTING_K if _looks_like_listing_query(retrieval_query) else DEFAULT_K
+
+        # Step 3: retrieve
+        try:
+            results = retrieve(retrieval_query, locale=locale, opco=opco, k=k)
+        except Exception as e:
+            return jsonify({"error": f"retrieval failed: {e}"}), 500
+
+        # Step 4: generate with full conversation history
+        generation = None
+        answer_text = ""
+        cited = []
+        if results:
+            try:
+                generation = generate_chat(messages, results, retrieval_query, was_rewritten)
+                answer_text = generation.answer
+                cited = generation.cited_sources
+            except Exception as e:
+                return jsonify({"error": f"generation failed: {e}"}), 500
+        else:
+            # No chunks retrieved — graceful fallback, don't burn an LLM call
+            answer_text = (
+                "I don't have anything in the help centre that matches that question"
+                f"{' for ' + opco if opco else ''}. Try rephrasing or removing the OpCo filter."
+            )
+
+        # Audit log
+        log_path = log_query(
+            question=latest_user_msg,
+            locale=locale,
+            opco=opco,
+            extra_filters={"retrieval_query": retrieval_query, "was_rewritten": was_rewritten,
+                           "turn": len(messages)},
+            retrieval=results,
+            generation=generation,
+            user_message=(generation.user_message if generation
+                          else build_user_message(latest_user_msg, results)),
+        )
+
+        return jsonify({
+            "answer": answer_text,
+            "cited_sources": cited,
+            "retrieval_query": retrieval_query,
+            "was_rewritten": was_rewritten,
+            "k": k,
+            "locale": locale,
+            "opco": opco,
+            "results": [_result_to_json(r) for r in results],
+            "tokens": (
+                {"input": generation.input_tokens, "output": generation.output_tokens}
+                if generation else None
+            ),
+            "log_path": str(log_path.relative_to(PROJECT_ROOT)),
         })
 
     @app.post("/api/ask")
