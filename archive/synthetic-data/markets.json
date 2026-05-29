@@ -1,0 +1,23 @@
+[
+  {
+    "id": "market_uk",
+    "name": "United Kingdom",
+    "language": "en-GB",
+    "currency": "GBP",
+    "synthetic": true
+  },
+  {
+    "id": "market_ie",
+    "name": "Ireland",
+    "language": "en-IE",
+    "currency": "EUR",
+    "synthetic": true
+  },
+  {
+    "id": "market_es",
+    "name": "Spain",
+    "language": "en-ES",
+    "currency": "EUR",
+    "synthetic": true
+  }
+]

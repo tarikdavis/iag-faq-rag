@@ -1,0 +1,92 @@
+[
+  {
+    "id": "transfer_bluesky_rewards",
+    "name": "BlueSky Rewards",
+    "partner_type": "airline",
+    "ratio": "1 avios = 1 BlueSky point",
+    "min_transfer": 1000,
+    "markets": ["uk", "ie"],
+    "tc_ids": ["tc_ids_collect"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_cheap_rewards",
+    "name": "Cheap Rewards",
+    "partner_type": "car_hire",
+    "ratio": "1 avios = 1 Cheap point",
+    "min_transfer": 1000,
+    "markets": ["uk", "es", "ie"],
+    "tc_ids": ["tc_ids_collect"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_clover_rewards",
+    "name": "Clover Rewards",
+    "partner_type": "airline",
+    "ratio": "1 avios = 6 Clover points",
+    "min_transfer": 2000,
+    "markets": ["ie"],
+    "tc_ids": ["tc_ids_collect"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_comfy_rewards",
+    "name": "Comfy Rewards",
+    "partner_type": "hotel",
+    "ratio": "1 avios = 2 Comfy points",
+    "min_transfer": 2000,
+    "markets": ["uk", "es", "ie"],
+    "tc_ids": ["tc_ids_estore"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_flowers_rewards",
+    "name": "Flowers Rewards",
+    "partner_type": "retailer",
+    "ratio": "1 avios = 3 Flower points",
+    "min_transfer": 4000,
+    "markets": ["uk", "es", "ie"],
+    "tc_ids": ["tc_ids_instore"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_lux_rewards",
+    "name": "Lux Rewards",
+    "partner_type": "retailer",
+    "ratio": "1 avios = 3 Lux points",
+    "min_transfer": 10000,
+    "markets": ["uk", "es", "ie"],
+    "tc_ids": ["tc_ids_instore"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_meridian_rewards",
+    "name": "Meridian Rewards",
+    "partner_type": "hotel",
+    "ratio": "1 avios = 8 Meridian points",
+    "min_transfer": 1500,
+    "markets": ["uk", "es", "ie"],
+    "tc_ids": ["tc_ids_estore"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_redsky_rewards",
+    "name": "RedSky Rewards",
+    "partner_type": "airline",
+    "ratio": "1 avios = 1 RedSky point",
+    "min_transfer": 5000,
+    "markets": ["es"],
+    "tc_ids": ["tc_ids_collect"],
+    "synthetic": true
+  },
+  {
+    "id": "transfer_viking_rewards",
+    "name": "Viking Rewards",
+    "partner_type": "airline",
+    "ratio": "1 avios = 3 Viking points",
+    "min_transfer": 3000,
+    "markets": ["uk"],
+    "tc_ids": ["tc_ids_collect"],
+    "synthetic": true
+  }
+]

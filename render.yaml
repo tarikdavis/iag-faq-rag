@@ -1,0 +1,48 @@
+# Render service config — auto-detected when you create a "Web Service"
+# from this repo. You can also paste these settings manually in the
+# Render dashboard if you prefer not to commit this file.
+#
+# Important env vars to set in the Render dashboard before the first deploy:
+#   CONTENTFUL_SPACE_ID            (required, build + runtime)
+#   CONTENTFUL_DELIVERY_TOKEN      (required, build + runtime; read-only)
+#   CONTENTFUL_ENVIRONMENT         (optional, defaults to 'master')
+#   ANTHROPIC_API_KEY              (required, runtime; secret)
+#   APP_PASSWORD                   (required, runtime; share with your team)
+#   COOKIE_SECRET                  (recommended, runtime; any random 32+ char string)
+
+services:
+  - type: web
+    name: iag-faq-rag-demo
+    runtime: python
+    rootDir: rag-pipeline
+    # Build phase:
+    #   1. install Python deps
+    #   2. build the FAQ index by fetching from Contentful CDA
+    #
+    # The index lives in chroma_db/ in the build artifact, so it ships
+    # with the deploy. Cold starts won't need to rebuild from Contentful.
+    # When you edit FAQs in Contentful, push an empty commit (or click
+    # "Manual Deploy → Clear cache & deploy" in Render) to re-trigger
+    # the build and pick up changes.
+    buildCommand: |
+      pip install -r requirements.txt
+      python src/build_index.py
+    startCommand: gunicorn 'src.server:create_app()' --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile -
+    plan: free  # change to starter ($7/mo) for always-on + persistent disk
+    autoDeploy: true  # deploy on every push to main
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Don't put secret values in this file. Set them in the Render dashboard.
+      - key: CONTENTFUL_SPACE_ID
+        sync: false
+      - key: CONTENTFUL_DELIVERY_TOKEN
+        sync: false
+      - key: CONTENTFUL_ENVIRONMENT
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: COOKIE_SECRET
+        sync: false

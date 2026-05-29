@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FAQ RAG demo — Avios sandbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f8f8fa;
+        --bg-card: #fefefe;
+        --bg-layer3: #edecf1;
+        --fg: #000000;
+        --fg-secondary: #4b4855;
+        --fg-tertiary: #737177;
+        --accent: #011dac;
+        --accent-subtle: #e2e8ff;
+        --border-tertiary: rgba(149, 147, 160, 0.25);
+        --opco-ba: #075aaa;
+        --opco-aer: #006a4e;
+        --opco-iberia: #d52b1e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+        background: var(--bg); color: var(--fg);
+        margin: 0; padding: 0; line-height: 1.5;
+      }
+      .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 80px; }
+      h1 { font-size: 28px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.5px; }
+      .sub { color: var(--fg-tertiary); font-size: 13px; margin-bottom: 28px; }
+      form { display: flex; flex-direction: column; gap: 14px; margin-bottom: 28px; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+      label {
+        display: block; font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        color: var(--fg-tertiary); margin-bottom: 4px;
+      }
+      input[type="text"], select {
+        width: 100%; padding: 12px 14px; font: inherit; font-size: 15px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-tertiary);
+        border-radius: 8px; color: var(--fg);
+        transition: border-color 120ms, box-shadow 120ms;
+      }
+      input[type="text"]:focus, select:focus {
+        outline: none; border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-subtle);
+      }
+      select { cursor: pointer; min-width: 180px; }
+      button {
+        padding: 12px 28px; font: inherit; font-weight: 600; font-size: 14px;
+        background: var(--accent); color: white;
+        border: 0; border-radius: 9999px; cursor: pointer;
+        transition: opacity 120ms;
+      }
+      button:hover { opacity: 0.9; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .panel {
+        background: var(--bg-card);
+        border: 1px solid var(--border-tertiary);
+        border-radius: 12px; padding: 20px 22px;
+        margin-bottom: 16px;
+      }
+      .panel h2 {
+        margin: 0 0 12px; font-size: 13px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        color: var(--fg-tertiary);
+      }
+      .answer { font-size: 16px; line-height: 1.65; color: var(--fg); white-space: pre-wrap; }
+      .meta {
+        display: flex; gap: 16px; flex-wrap: wrap;
+        font-size: 12px; color: var(--fg-tertiary); margin-top: 14px;
+      }
+      .meta strong { color: var(--fg-secondary); font-weight: 600; }
+      .results-list { list-style: none; padding: 0; margin: 0; }
+      .results-list li {
+        padding: 12px 0; border-top: 1px solid var(--border-tertiary);
+        display: flex; gap: 12px; align-items: start;
+      }
+      .results-list li:first-child { border-top: none; }
+      .rank {
+        flex-shrink: 0;
+        background: var(--bg-layer3); border-radius: 6px;
+        padding: 2px 8px; font-size: 12px; font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--fg-secondary);
+      }
+      .result-body { flex: 1; min-width: 0; }
+      .result-q { font-weight: 600; color: var(--fg); font-size: 14px; margin-bottom: 4px; }
+      .result-id {
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+        color: var(--fg-tertiary); word-break: break-all;
+      }
+      .result-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; }
+      .badge { padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+      .badge-ba { background: rgba(7,90,170,0.1); color: var(--opco-ba); }
+      .badge-aer { background: rgba(0,106,78,0.1); color: var(--opco-aer); }
+      .badge-iberia { background: rgba(213,43,30,0.1); color: var(--opco-iberia); }
+      .badge-dist { background: var(--bg-layer3); color: var(--fg-secondary); }
+      .error {
+        background: rgba(213,43,30,0.06);
+        border-color: rgba(213,43,30,0.3);
+        color: var(--opco-iberia);
+      }
+      .loader { color: var(--fg-tertiary); font-size: 14px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>FAQ RAG demo</h1>
+      <div class="sub">
+        Ask a question. Choose an OpCo to apply the hard pre-retrieval filter.
+        The pipeline retrieves top-k FAQ chunks, sends them to Claude with a
+        grounded prompt, and returns a cited answer.
+      </div>
+
+      <form id="ask-form">
+        <div>
+          <label for="question">Question</label>
+          <input type="text" id="question" autocomplete="off"
+                 placeholder="e.g. I&rsquo;m missing my Avios &mdash; what should I do?" required />
+        </div>
+        <div class="row">
+          <div style="flex: 1; min-width: 200px;">
+            <label for="opco">OpCo (hard filter)</label>
+            <select id="opco">
+              <option value="all">All OpCos (no filter)</option>
+              <option value="british-airways">British Airways Club</option>
+              <option value="aer-lingus">AerClub</option>
+              <option value="iberia">Iberia Club</option>
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 160px;">
+            <label for="locale">Locale</label>
+            <select id="locale">
+              <option value="en-GB">en-GB (English)</option>
+              <option value="es-ES">es-ES (Spanish)</option>
+            </select>
+          </div>
+          <button type="submit" id="submit-btn">Ask</button>
+        </div>
+      </form>
+
+      <div id="output"></div>
+
+      <footer style="margin-top:48px; padding-top:20px; border-top:1px solid var(--border-tertiary); font-size:12px; color:var(--fg-tertiary); line-height:1.65;">
+        <div id="build-info" style="margin-bottom:8px; font-family:'JetBrains Mono', monospace; font-size:11px;"></div>
+        <strong style="color:var(--fg-secondary)">Why no knowledge graph here?</strong>
+        The FAQ corpus has a flat relational structure (Hub → Topic → FAQ, plus one-hop <code>relatedFaqs</code>) that's fully covered by chunk metadata — a graph layer would add complexity without unlocking multi-hop traversal. If the schema grew richer (e.g. FAQ cites Policy → Policy applies in Market → Market has Tier benefits), a vector + graph hybrid would start to earn its keep. <a href="/graph">See the current relationship cluster view →</a>
+      </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

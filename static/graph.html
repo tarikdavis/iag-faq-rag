@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FAQ relationship cluster — Avios sandbox</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"></script>
+    <style>
+      :root {
+        --bg: #f8f8fa;
+        --bg-card: #fefefe;
+        --bg-layer3: #edecf1;
+        --fg: #000000;
+        --fg-secondary: #4b4855;
+        --fg-tertiary: #737177;
+        --accent: #011dac;
+        --accent-subtle: #e2e8ff;
+        --border-tertiary: rgba(149, 147, 160, 0.25);
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+        background: var(--bg); color: var(--fg);
+        margin: 0; padding: 0; height: 100vh;
+        display: flex; flex-direction: column;
+      }
+      header {
+        padding: 16px 24px;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border-tertiary);
+        display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+      }
+      h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.4px; }
+      .sub { color: var(--fg-tertiary); font-size: 12px; }
+      .controls { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+      label { font-size: 11px; font-weight: 600; color: var(--fg-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+      select {
+        padding: 6px 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-tertiary);
+        border-radius: 6px; font: inherit; font-size: 13px;
+        color: var(--fg); cursor: pointer;
+      }
+      select:focus { outline: none; border-color: var(--accent); }
+      a { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 500; }
+      a:hover { text-decoration: underline; }
+
+      main { flex: 1; display: flex; min-height: 0; }
+      #cy {
+        flex: 1; background: var(--bg-card);
+      }
+      aside {
+        width: 320px; padding: 16px 20px;
+        background: var(--bg-card);
+        border-left: 1px solid var(--border-tertiary);
+        overflow-y: auto;
+      }
+      aside h2 {
+        margin: 0 0 8px; font-size: 12px;
+        font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.5px; color: var(--fg-tertiary);
+      }
+      aside .empty { color: var(--fg-tertiary); font-size: 13px; }
+      .detail { margin-bottom: 16px; }
+      .detail-q { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+      .detail-row { font-size: 12px; color: var(--fg-secondary); margin: 4px 0; }
+      .detail-row strong { color: var(--fg); font-weight: 600; }
+      .detail-id {
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+        color: var(--fg-tertiary); word-break: break-all;
+      }
+      .legend { padding-top: 16px; border-top: 1px solid var(--border-tertiary); }
+      .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 4px 0; }
+      .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+      .stats { font-size: 12px; color: var(--fg-tertiary); }
+      footer.note {
+        padding: 10px 24px; font-size: 11px; color: var(--fg-tertiary);
+        background: var(--bg-card); border-top: 1px solid var(--border-tertiary);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>FAQ relationship cluster</h1>
+        <div class="sub">Each node is one FAQ. Coloured by hub. Edges are explicit <code>relatedFaqs</code> links.</div>
+      </div>
+      <div class="controls">
+        <div>
+          <label for="locale">Locale</label><br />
+          <select id="locale">
+            <option value="en-GB">en-GB</option>
+            <option value="es-ES">es-ES</option>
+          </select>
+        </div>
+        <div>
+          <label for="opco">OpCo dim</label><br />
+          <select id="opco">
+            <option value="all">All visible</option>
+            <option value="british-airways">BA only</option>
+            <option value="aer-lingus">Aer only</option>
+            <option value="iberia">Iberia only</option>
+          </select>
+        </div>
+        <div>
+          <label for="layout">Layout</label><br />
+          <select id="layout">
+            <option value="cose">Force-directed (cose)</option>
+            <option value="concentric">Concentric (by hub)</option>
+            <option value="grid">Grid</option>
+          </select>
+        </div>
+        <a href="/">← Back to RAG demo</a>
+      </div>
+    </header>
+    <main>
+      <div id="cy"></div>
+      <aside>
+        <h2>Selected FAQ</h2>
+        <div id="detail" class="empty">Click any node to inspect it.</div>
+        <div class="legend">
+          <h2>Hubs (colour key)</h2>
+          <div id="legend"></div>
+          <div class="stats" id="stats"></div>
+        </div>
+      </aside>
+    </main>
+    <footer class="note">
+      Graph view shows what's explicitly linked via <code>relatedFaqs</code>. Hierarchy (Hub → Topic → FAQ) is encoded as colour and isn't drawn as edges to keep the view legible.
+    </footer>
+    <script src="/static/graph.js"></script>
+  </body>
+</html>

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "partner_bluesky_airlines",
+    "name": "BlueSky Airlines",
+    "type": "airline",
+    "categories": ["travel", "premium"],
+    "markets": ["uk", "ie"],
+    "description": "Long-haul carrier and AVIOS partner. Voted best air carrier in 2025.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_cheap_cars",
+    "name": "Cheap Cars",
+    "type": "car_hire",
+    "categories": ["travel"],
+    "markets": ["uk", "es", "ie"],
+    "description": "Global car rental partner with over 3,150 locations and 24-hour customer support.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_clover_airlines",
+    "name": "Clover Airlines",
+    "type": "airline",
+    "categories": ["travel"],
+    "markets": ["ie"],
+    "description": "Irish short-haul carrier. AVIOS partner serving European routes.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_comfy_hotels",
+    "name": "Comfy Hotels",
+    "type": "hotel",
+    "categories": ["travel"],
+    "markets": ["uk", "es", "ie"],
+    "description": "Mid-tier hotel chain with city-centre and airport properties across Europe.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_just_flowers",
+    "name": "Just Flowers",
+    "type": "retailer",
+    "categories": ["shopping"],
+    "markets": ["uk"],
+    "description": "Florist with same-day UK delivery and a monthly bouquet subscription service.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_lux_store",
+    "name": "Lux Store",
+    "type": "retailer",
+    "categories": ["shopping", "premium"],
+    "markets": ["uk"],
+    "description": "Luxury department store offering personal stylist services and an exclusive product range.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_meridian_hotels",
+    "name": "Meridian Hotels",
+    "type": "hotel",
+    "categories": ["travel", "premium"],
+    "markets": ["uk", "es", "ie"],
+    "description": "Boutique premium hotel group with 40 properties across Europe.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_redsky_airlines",
+    "name": "RedSky Airlines",
+    "type": "airline",
+    "categories": ["travel"],
+    "markets": ["es"],
+    "description": "Spanish carrier serving European and long-haul routes. AVIOS partner in Spain.",
+    "synthetic": true
+  },
+  {
+    "id": "partner_viking_airlines",
+    "name": "Viking Airlines",
+    "type": "airline",
+    "categories": ["travel"],
+    "markets": ["uk"],
+    "description": "Nordic-focused carrier with routes from London to Iceland and Scandinavia.",
+    "synthetic": true
+  }
+]

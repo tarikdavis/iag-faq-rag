@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+chroma_db/
+logs/
+build_manifest.json

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "offer_bluesky_2x_summer26",
+    "partner_id": "partner_bluesky_airlines",
+    "rate_shape": "tiered",
+    "title": "Double avios on long-haul this summer",
+    "need_to_know_title": "What you need to know",
+    "need_to_know_description": "Earn up to 10 avios per £1 on BlueSky Airlines long-haul flights booked between 1 June and 31 August 2026. Avios are calculated on the base fare excluding taxes, surcharges and seat-selection fees. Rewards appear in your AVIOS account within 14 days of flight completion. Your AVIOS membership number must be added at the time of booking; it cannot be added retrospectively after travel.",
+    "tiered_rates": [
+      { "condition": "Spend over £150 per booking", "rate": { "currency": "GBP", "avios_per_unit": 10 } },
+      { "condition": "Spend under £149.99 per booking", "rate": { "currency": "GBP", "avios_per_unit": 5 } },
+      { "condition": "Discounted fares (sale class)", "rate": { "currency": "GBP", "avios_per_unit": 3 } }
+    ],
+    "channel_rates": null,
+    "avios_rates_description": "The headline rate of 10 avios per £1 applies to bookings over £150 in standard fare classes. Bookings under £149.99 earn at the lower rate. Discounted (sale-class) fares earn at the lowest rate, regardless of price. Award flights and upgrades using avios do not earn during this offer. Rewards are credited 14 days after the flight is taken, not at the point of booking.",
+    "why_title": "Why we love BlueSky Airlines",
+    "why_description": "BlueSky was voted best long-haul carrier in 2025 for the third year running. Its mainline cabin offers extra legroom as standard, and Business Class includes flat-bed seats and a partner-hosted lounge in London Heathrow. AVIOS members have collected on BlueSky bookings since 2018, and this summer offer is the largest seasonal boost we've ever run.",
+    "categories": ["travel", "summer", "double_avios"],
+    "eligible_tiers": ["bronze", "silver", "gold", "gold_guest_list"],
+    "markets": ["uk", "ie"],
+    "valid_from": "2026-06-01",
+    "valid_to": "2026-08-31",
+    "tc_ids": ["tc_bluesky_summer26"],
+    "synthetic": true
+  },
+  {
+    "id": "offer_cheap_cars",
+    "partner_id": "partner_cheap_cars",
+    "rate_shape": "channel",
+    "title": "Collect avios with Cheap Cars",
+    "need_to_know_title": "What you need to know",
+    "need_to_know_description": "Earn 2 avios per £1 spent on qualifying Cheap Cars rentals. Your AVIOS membership number must be on the booking at the time of reservation, with the named driver matching the AVIOS account holder. Avios may take up to 31 days after the rental ends to appear in your account. Cheap Cars age, driver and credit requirements apply.",
+    "tiered_rates": null,
+    "channel_rates": {
+      "online": { "currency": "GBP", "avios_per_unit": 2 },
+      "instore": null,
+      "previous": null
+    },
+    "avios_rates_description": "The 2-avios-per-£1 rate applies to qualifying rentals booked through the Cheap Cars website with a valid AVIOS membership number. Insurance add-ons, fuel charges and one-way drop-off fees do not earn avios. Rentals with corporate or third-party discount codes are excluded.",
+    "why_title": "Why we love Cheap Cars",
+    "why_description": "Cheap Cars is a global rental partner with over 3,150 locations and 24-hour customer support. Mandatory charges and roadside assistance are included. Spend your avios on flights, cabin upgrades, hotels and more.",
+    "categories": ["travel"],
+    "eligible_tiers": ["blue", "bronze", "silver", "gold", "gold_guest_list"],
+    "markets": ["uk", "es", "ie"],
+    "valid_from": "2026-01-01",
+    "valid_to": "2026-12-31",
+    "tc_ids": ["tc_cheap_cars_2026"],
+    "synthetic": true
+  },
+  {
+    "id": "offer_redsky_3x",
+    "partner_id": "partner_redsky_airlines",
+    "rate_shape": "channel",
+    "title": "Triple avios on RedSky bookings in 2026",
+    "need_to_know_title": "What you need to know",
+    "need_to_know_description": "Earn 10 avios per €1 on RedSky Airlines bookings made between 1 January and 31 December 2026, on any route. Avios are calculated on the base fare in euros, excluding taxes and surcharges. Rewards appear in your AVIOS account within 14 days of travel.",
+    "tiered_rates": null,
+    "channel_rates": {
+      "online": { "currency": "EUR", "avios_per_unit": 10 },
+      "instore": null,
+      "previous": null
+    },
+    "avios_rates_description": "The 10-avios-per-€1 rate is the standard earn rate for the duration of the 2026 offer year. Award flights and upgrades using avios do not earn during this offer. The offer is exclusive to AVIOS members in the Spanish market.",
+    "why_title": "Why we love RedSky Airlines",
+    "why_description": "RedSky was voted best Spanish carrier in 2025. The airline serves European and long-haul routes from Madrid and Barcelona, and AVIOS members enjoy priority check-in and a partner-hosted lounge in Madrid Barajas.",
+    "categories": ["travel", "triple_avios"],
+    "eligible_tiers": ["bronze", "silver", "gold", "gold_guest_list"],
+    "markets": ["es"],
+    "valid_from": "2026-01-01",
+    "valid_to": "2026-12-31",
+    "tc_ids": ["tc_redsky_2026"],
+    "synthetic": true
+  }
+]

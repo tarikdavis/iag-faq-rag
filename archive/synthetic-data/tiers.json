@@ -1,0 +1,151 @@
+[
+  {
+    "id": "tier_blue",
+    "name": "Blue",
+    "order": 1,
+    "entry_criteria": "Open to all AVIOS members on registration.",
+    "benefits": [
+      {
+        "slug": "earn_avios_on_partners",
+        "description": "Earn avios on every eligible purchase with partner airlines, hotels, retailers and more."
+      }
+    ],
+    "synthetic": true
+  },
+  {
+    "id": "tier_bronze",
+    "name": "Bronze",
+    "order": 2,
+    "entry_criteria": "3500 tier points in a membership year.",
+    "benefits": [
+      {
+        "slug": "earn_avios_on_partners",
+        "description": "Earn avios on every eligible purchase with partner airlines, hotels, retailers and more."
+      },
+      {
+        "slug": "priority_check_in",
+        "description": "Use priority check-in desks at most airports, even on a standard ticket."
+      },
+      {
+        "slug": "extra_baggage_allowance",
+        "description": "Take an additional checked bag on partner airline flights at no extra cost."
+      }
+    ],
+    "synthetic": true
+  },
+  {
+    "id": "tier_silver",
+    "name": "Silver",
+    "order": 3,
+    "entry_criteria": "7500 tier points in a membership year.",
+    "benefits": [
+      {
+        "slug": "earn_avios_on_partners",
+        "description": "Earn avios on every eligible purchase with partner airlines, hotels, retailers and more."
+      },
+      {
+        "slug": "priority_check_in",
+        "description": "Use priority check-in desks at most airports, even on a standard ticket."
+      },
+      {
+        "slug": "extra_baggage_allowance",
+        "description": "Take an additional checked bag on partner airline flights at no extra cost."
+      },
+      {
+        "slug": "lounge_access_with_partner",
+        "description": "Access partner airline lounges before your flight when travelling on a partner airline."
+      },
+      {
+        "slug": "priority_boarding",
+        "description": "Board the aircraft before general boarding groups."
+      }
+    ],
+    "synthetic": true
+  },
+  {
+    "id": "tier_gold",
+    "name": "Gold",
+    "order": 4,
+    "entry_criteria": "20000 tier points in a membership year.",
+    "benefits": [
+      {
+        "slug": "earn_avios_on_partners",
+        "description": "Earn avios on every eligible purchase with partner airlines, hotels, retailers and more."
+      },
+      {
+        "slug": "priority_check_in",
+        "description": "Use priority check-in desks at most airports, even on a standard ticket."
+      },
+      {
+        "slug": "extra_baggage_allowance",
+        "description": "Take an additional checked bag on partner airline flights at no extra cost."
+      },
+      {
+        "slug": "lounge_access_with_partner",
+        "description": "Access partner airline lounges before your flight when travelling on a partner airline."
+      },
+      {
+        "slug": "priority_boarding",
+        "description": "Board the aircraft before general boarding groups."
+      },
+      {
+        "slug": "complimentary_seat_selection",
+        "description": "Reserve your preferred seat at no extra cost on partner airline flights."
+      },
+      {
+        "slug": "cabin_upgrade_vouchers",
+        "description": "Receive two cabin-upgrade vouchers per membership year, redeemable on partner airline flights."
+      }
+    ],
+    "synthetic": true
+  },
+  {
+    "id": "tier_gold_guest_list",
+    "name": "Gold Guest List",
+    "order": 5,
+    "entry_criteria": "50000 tier points in a membership year, plus invitation by AVIOS.",
+    "benefits": [
+      {
+        "slug": "earn_avios_on_partners",
+        "description": "Earn avios on every eligible purchase with partner airlines, hotels, retailers and more."
+      },
+      {
+        "slug": "priority_check_in",
+        "description": "Use priority check-in desks at most airports, even on a standard ticket."
+      },
+      {
+        "slug": "extra_baggage_allowance",
+        "description": "Take an additional checked bag on partner airline flights at no extra cost."
+      },
+      {
+        "slug": "lounge_access_with_partner",
+        "description": "Access partner airline lounges before your flight when travelling on a partner airline."
+      },
+      {
+        "slug": "priority_boarding",
+        "description": "Board the aircraft before general boarding groups."
+      },
+      {
+        "slug": "complimentary_seat_selection",
+        "description": "Reserve your preferred seat at no extra cost on partner airline flights."
+      },
+      {
+        "slug": "cabin_upgrade_vouchers",
+        "description": "Receive two cabin-upgrade vouchers per membership year, redeemable on partner airline flights."
+      },
+      {
+        "slug": "concierge_service",
+        "description": "Twenty-four-hour concierge support for travel changes, dining reservations and partner offers."
+      },
+      {
+        "slug": "guest_lounge_access",
+        "description": "Bring up to two guests into partner lounges, regardless of their tier."
+      },
+      {
+        "slug": "first_class_voucher",
+        "description": "One first-class upgrade voucher per membership year for a partner airline long-haul flight."
+      }
+    ],
+    "synthetic": true
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "member_a001",
+    "name": "Maya",
+    "tier_id": "tier_blue",
+    "market": "uk",
+    "avios_balance": 42300,
+    "synthetic": true
+  },
+  {
+    "id": "member_a002",
+    "name": "Idris",
+    "tier_id": "tier_bronze",
+    "market": "uk",
+    "avios_balance": 27500,
+    "synthetic": true
+  },
+  {
+    "id": "member_a003",
+    "name": "Priya",
+    "tier_id": "tier_silver",
+    "market": "uk",
+    "avios_balance": 75000,
+    "synthetic": true
+  },
+  {
+    "id": "member_a004",
+    "name": "Sam",
+    "tier_id": "tier_gold",
+    "market": "uk",
+    "avios_balance": 129000,
+    "synthetic": true
+  },
+  {
+    "id": "member_a005",
+    "name": "Eleanor",
+    "tier_id": "tier_gold_guest_list",
+    "market": "uk",
+    "avios_balance": 258120,
+    "synthetic": true
+  },
+  {
+    "id": "member_a006",
+    "name": "Niamh",
+    "tier_id": "tier_blue",
+    "market": "ie",
+    "avios_balance": 32800,
+    "synthetic": true
+  },
+  {
+    "id": "member_a007",
+    "name": "Cathal",
+    "tier_id": "tier_gold_guest_list",
+    "market": "ie",
+    "avios_balance": 300000,
+    "synthetic": true
+  },
+  {
+    "id": "member_a008",
+    "name": "Rosa",
+    "tier_id": "tier_bronze",
+    "market": "es",
+    "avios_balance": 60000,
+    "synthetic": true
+  },
+  {
+    "id": "member_a009",
+    "name": "Diego",
+    "tier_id": "tier_gold",
+    "market": "es",
+    "avios_balance": 80000,
+    "synthetic": true
+  },
+  {
+    "id": "member_a010",
+    "name": "Elena",
+    "tier_id": "tier_gold_guest_list",
+    "market": "es",
+    "avios_balance": 120000,
+    "synthetic": true
+  }
+]
