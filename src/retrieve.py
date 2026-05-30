@@ -56,7 +56,8 @@ class RetrievalResult:
     body_markdown: str       # the full answer — sent to the generator
     canonical_url: str       # citation URL
     hub_name: str            # 'Shopping online'
-    topic_name: str          # 'Missing Avios'
+    topic_name: str          # 'Missing Avios' — canonical / primary topic
+    additional_topic_names: list[str]  # extra topic blocks this FAQ appears in
     applicable_opcos: list[str]  # the actual opcos this FAQ serves
     last_reviewed_at: str | None
     distance: float          # lower = closer match. >1.0 = mediocre.
@@ -174,6 +175,7 @@ def retrieve(
     ):
         opcos_csv = meta.get("applicable_opcos_csv") or ""
         opcos = [o for o in opcos_csv.split(",") if o]
+        addl_names = [n for n in (meta.get("additional_topic_names") or "").split(",") if n]
         results.append(RetrievalResult(
             rank=rank,
             chunk_id=cid,
@@ -185,6 +187,7 @@ def retrieve(
             canonical_url=meta.get("canonical_url", ""),
             hub_name=meta.get("hub_name", ""),
             topic_name=meta.get("topic_name", ""),
+            additional_topic_names=addl_names,
             applicable_opcos=opcos,
             last_reviewed_at=meta.get("last_reviewed_at") or None,
             distance=dist,

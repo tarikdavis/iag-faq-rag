@@ -98,9 +98,14 @@ class FaqChunk:
     hub_id: str | None
     hub_name: str | None
     hub_slug: str | None
-    topic_id: str | None
+    topic_id: str | None              # canonical / primary topic
     topic_name: str | None
     topic_slug: str | None
+    # Additional topics (Option C, v4.1.2): a FAQ can surface under multiple
+    # topic blocks during browse without duplicating the entry. RAG stores
+    # these for display only — primary topic still drives chunk metadata.
+    additional_topic_ids: list[str] = field(default_factory=list)
+    additional_topic_names: list[str] = field(default_factory=list)
 
     # The load-bearing filter signal — HARD pre-retrieval filter in the
     # vector store (never re-rank on this). Per v4.1.1 spec.
@@ -201,6 +206,20 @@ def _read_link_id(field: Any) -> str | None:
     return None
 
 
+def _read_link_ids(field: Any) -> list[str]:
+    """Array-of-links fields — extract every linked entry's id."""
+    inner = _unwrap_locale(field, "en-GB")
+    if not isinstance(inner, list):
+        return []
+    out: list[str] = []
+    for item in inner:
+        if isinstance(item, dict) and "sys" in item:
+            sid = item["sys"].get("id")
+            if isinstance(sid, str):
+                out.append(sid)
+    return out
+
+
 def _read_bool(field: Any) -> bool:
     return bool(_unwrap_locale(field, "en-GB"))
 
@@ -284,6 +303,19 @@ def load_faq_chunks() -> list[FaqChunk]:
         # `opcos` is what we store on the chunk — the effective set, not the
         # FAQ's raw set. Retrieval filters on this.
         opcos = sorted(effective_opcos)
+
+        # Additional topics (Option C). Resolve IDs to names via the topic_by_id
+        # lookup we already built. Skip any IDs we can't resolve.
+        additional_topic_ids = _read_link_ids(fields.get("additionalTopics"))
+        additional_topic_names_list: list[str] = []
+        for tid in additional_topic_ids:
+            t = topic_by_id.get(tid)
+            if t:
+                # Use en-GB name for the RAG (loader doesn't know the query locale
+                # at chunk-build time — locale split happens per-chunk below).
+                name = _read_string(t["fields"].get("name"), "en-GB")
+                if name:
+                    additional_topic_names_list.append(name)
         slug = _read_string(fields.get("slug"), "en-GB")
         internal_name = _read_string(fields.get("internalName"), "en-GB")
         last_reviewed = _read_string(fields.get("lastReviewedAt"), "en-GB") or None
@@ -340,6 +372,8 @@ def load_faq_chunks() -> list[FaqChunk]:
                 topic_id=topic_id,
                 topic_name=_read_string(topic["fields"].get("name"), locale) if topic else None,
                 topic_slug=_read_string(topic["fields"].get("slug"), "en-GB") if topic else None,
+                additional_topic_ids=additional_topic_ids,
+                additional_topic_names=additional_topic_names_list,
                 applicable_opcos=opcos,
                 last_reviewed_at=last_reviewed,
                 related_faq_ids=related_faqs,

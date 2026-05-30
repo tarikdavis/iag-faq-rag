@@ -494,6 +494,7 @@ def _result_to_json(r: RetrievalResult) -> dict[str, Any]:
         "canonical_url": r.canonical_url,
         "hub_name": r.hub_name,
         "topic_name": r.topic_name,
+        "additional_topic_names": r.additional_topic_names,
         "applicable_opcos": r.applicable_opcos,
         "distance": r.distance,
     }

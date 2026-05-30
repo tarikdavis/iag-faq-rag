@@ -164,17 +164,24 @@ function renderConversation() {
     // assistant — bubble + per-turn collapsible sources/audit below
     let sourcesHtml = '';
     if (t.retrievedChunks && t.retrievedChunks.length) {
-      const items = t.retrievedChunks.map((r) => `
+      const items = t.retrievedChunks.map((r) => {
+        const addl = (r.additional_topic_names || []).filter(Boolean);
+        const addlLine = addl.length
+          ? `<div style="font-size:11px;color:var(--fg-tertiary);margin-top:2px">also surfaces in: ${addl.map(escapeHtml).join(', ')}</div>`
+          : '';
+        return `
         <div class="source-item">
           <div class="source-q">${escapeHtml(r.question || r.internal_name)}</div>
           <div class="source-id">${escapeHtml(r.internal_name)}</div>
+          ${addlLine}
           <div class="source-badges">
             ${(r.applicable_opcos || []).map(opcoBadge).join('')}
             <span class="badge badge-dist">dist ${r.distance.toFixed(2)}</span>
             ${r.canonical_url ? `<a href="${escapeAttr(r.canonical_url)}" target="_blank" rel="noreferrer">↗ live</a>` : ''}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
       const rewriteNote = t.wasRewritten
         ? `<div style="margin-bottom:8px; font-style:italic; color:var(--fg-tertiary)">Retrieval query rewritten: "${escapeHtml(t.retrievalQuery)}"</div>`
         : '';

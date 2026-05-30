@@ -147,6 +147,10 @@ def _metadata_for(c: FaqChunk) -> dict[str, str | int | bool]:
         "topic_id": c.topic_id or "",
         "topic_name": c.topic_name or "",
         "topic_slug": c.topic_slug or "",
+        # Additional topics (Option C) — CSV for compactness. Display-only
+        # in the current retrieval; we don't filter on these.
+        "additional_topic_ids": ",".join(c.additional_topic_ids),
+        "additional_topic_names": ",".join(c.additional_topic_names),
         # The load-bearing opco filter — three booleans, one per opco.
         # Query: where={"opco_british_airways": True}
         "opco_british_airways": "british-airways" in c.applicable_opcos,
