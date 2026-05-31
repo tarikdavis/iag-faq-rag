@@ -46,7 +46,7 @@ from chromadb.config import Settings
 # Allow `python src/build_index.py` to find the src package
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.load_faqs import FaqChunk, LOCALES, load_faq_chunks
+from src.load_faqs import FaqChunk, LOCALES, load_all_chunks
 
 
 # -----------------------------------------------------------------------------
@@ -69,7 +69,7 @@ def collection_name_for(locale: str) -> str:
 
 def build() -> None:
     """Wipe the existing index and rebuild from the current Contentful state."""
-    chunks = load_faq_chunks()
+    chunks = load_all_chunks()
     if not chunks:
         print("No chunks to index — exiting without touching ChromaDB.")
         return
@@ -111,10 +111,15 @@ def build() -> None:
     # Write a small manifest the running server can read at startup so the
     # UI footer can show 'built X · N chunks'. Useful for confirming a fresh
     # build picked up the Contentful changes you just made.
+    chunks_by_source: dict[str, int] = {}
+    for c in chunks:
+        chunks_by_source[c.source_type] = chunks_by_source.get(c.source_type, 0) + 1
+
     manifest = {
         "built_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "total_chunks": len(chunks),
         "chunks_by_locale": {loc: len(items) for loc, items in by_locale.items()},
+        "chunks_by_source": chunks_by_source,
     }
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2))
     print(f"\nWrote build manifest: {MANIFEST_PATH.relative_to(PROJECT_ROOT)}")
@@ -161,6 +166,9 @@ def _metadata_for(c: FaqChunk) -> dict[str, str | int | bool]:
         "applicable_opcos_csv": ",".join(c.applicable_opcos),
         "last_reviewed_at": c.last_reviewed_at or "",
         "related_faq_ids": ",".join(c.related_faq_ids),
+        # source_type drives the badge in the chunk UI and lets us add
+        # per-source filtering at query time later (currently no filter).
+        "source_type": c.source_type,
     }
 
 

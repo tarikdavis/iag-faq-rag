@@ -81,16 +81,19 @@ You answer questions for members of the Avios loyalty programme (operated by IAG
 
 ANSWERING RULES:
 
-1. Answer ONLY from the provided FAQ context below. Do not invent facts, rates, dates, partner names, claim windows, or URLs that don't appear in the context.
+1. Answer ONLY from the context provided below. The context contains a mix of source types: FAQ entries, inspiration page sections (educational guides), and banner components (feature explainers). Do not invent facts, rates, dates, partner names, claim windows, or URLs that don't appear in the context.
 
-2. The context has been pre-filtered for the user's loyalty programme (OpCo). Every FAQ shown is applicable to them — you don't need to caveat by OpCo unless the FAQ itself does.
+2. The context has been pre-filtered for the user's loyalty programme (OpCo). Every item shown is applicable to them — you don't need to caveat by OpCo unless the source itself does.
 
-3. If the context doesn't contain the information needed to answer the question, say: "I don't have that information in the help centre — please contact customer service for the most accurate answer." Do not guess.
+3. Handling partial vs missing information — read carefully:
+   - If NONE of the context is relevant to the question, reply with exactly: "I don't have that information in the help centre — please contact customer service for the most accurate answer." Nothing else.
+   - If the context PARTIALLY answers the question (e.g. explains *how* something works but not the exact figure they asked for), answer with what you do have and note plainly what you can't tell them — e.g. "The exact amount depends on route and dates, which I can't look up here — use the Reward Flight finder for live prices." Do NOT use the verbatim "I don't have that information…" sentence in this case; it is reserved for total refusals.
+   - Never combine the verbatim refusal sentence with an actual answer. Pick one mode.
 
-4. Cite every fact. End your answer with a "Sources" block listing the FAQ IDs you drew from (one per line, with the FAQ's question as the label):
+4. Cite every fact. End your answer with a "Sources" block listing the source IDs you drew from (one per line, with the source's title as the label):
 
    Sources:
-   - faq-<slug>: <Question text>
+   - <source-id>: <Title>
 
 5. Style: neutral, factual, plain language. Short paragraphs. Use markdown lightly (bullet lists OK, no headers). Don't oversell or use marketing language. Don't add sign-offs like "Hope that helps!".
 
@@ -213,16 +216,50 @@ def build_user_message(question: str, results: list[RetrievalResult]) -> str:
     )
 
 
+def _strip_sources_block(answer: str) -> str:
+    """
+    Remove the trailing 'Sources:' block (and everything after it) from the
+    model's answer before it's sent to the UI.
+
+    Why we strip rather than tell the model not to emit it: we still need
+    _extract_citations to pull IDs out of a Sources block for the audit log.
+    The web UI already shows retrieved sources in the per-turn expander, so
+    duplicating the IDs inline in the answer body is just noise — and noise
+    that distracts reviewers from the actual content they're auditing.
+
+    Strip is intentionally permissive on formatting — the model sometimes
+    emits `Sources:` plain, sometimes `**Sources:**`, sometimes `## Sources`.
+    """
+    pattern = re.compile(
+        r"\n+\s*(?:#{1,6}\s*)?(?:\*\*\s*)?Sources?\s*:?\s*(?:\*\*)?\s*\n.*$",
+        re.DOTALL | re.IGNORECASE,
+    )
+    return pattern.sub("", answer).rstrip()
+
+
 def _extract_citations(answer: str) -> list[str]:
     """
-    Pull `faq-<slug>` IDs out of the Sources block. The model is
-    instructed to put them there; we extract them programmatically
-    rather than re-parsing the answer body so the audit log is durable
-    even if the model bends the format slightly.
+    Pull source IDs out of the Sources block. The model is instructed to
+    put them there; we extract programmatically rather than re-parsing
+    the answer body, so the audit log is durable even if the model bends
+    the format slightly.
+
+    Matches several shapes:
+      - `faq-<slug>` (with optional `-<8charhash>` suffix for hashed sys.ids)
+      - `inspiration-section-<slug>` / `section-<slug>` (inspirationPageSection IDs)
+      - `banner-<slug>` (component-banner IDs)
+      - Any Contentful sys.id that's 22 chars of [a-zA-Z0-9]
     """
-    # Match faq IDs that look like 'faq-...' — they appear in the
-    # Sources block as `- faq-im-missing-avios: Question text`
-    return list(dict.fromkeys(re.findall(r"\bfaq-[a-z0-9-]+(?:-[a-f0-9]{8})?\b", answer)))
+    patterns = [
+        r"\bfaq-[a-z0-9-]+(?:-[a-f0-9]{8})?\b",
+        r"\b(?:inspiration[-_]section|section)-[a-z0-9-]+\b",
+        r"\bbanner-[a-z0-9-]+\b",
+        r"\b[a-zA-Z0-9]{22}\b",  # raw Contentful sys.ids
+    ]
+    found: list[str] = []
+    for p in patterns:
+        found.extend(re.findall(p, answer))
+    return list(dict.fromkeys(found))
 
 
 def generate(question: str, results: list[RetrievalResult]) -> GenerationResult:
@@ -235,9 +272,13 @@ def generate(question: str, results: list[RetrievalResult]) -> GenerationResult:
         messages=[{"role": "user", "content": user_message}],
     )
     answer_text = response.content[0].text if response.content else ""
+    # Order matters: extract citations from the raw answer (which still has
+    # the Sources block) BEFORE stripping the block for display.
+    cited = _extract_citations(answer_text)
+    answer_text = _strip_sources_block(answer_text)
     return GenerationResult(
         answer=answer_text,
-        cited_sources=_extract_citations(answer_text),
+        cited_sources=cited,
         model=MODEL_ID,
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,
@@ -283,9 +324,11 @@ def generate_chat(
         messages=messages,
     )
     answer_text = response.content[0].text if response.content else ""
+    cited = _extract_citations(answer_text)
+    answer_text = _strip_sources_block(answer_text)
     return GenerationResult(
         answer=answer_text,
-        cited_sources=_extract_citations(answer_text),
+        cited_sources=cited,
         model=MODEL_ID,
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,

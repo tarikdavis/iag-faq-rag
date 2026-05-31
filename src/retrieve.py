@@ -55,12 +55,13 @@ class RetrievalResult:
     short_answer: str        # one-paragraph TL;DR
     body_markdown: str       # the full answer — sent to the generator
     canonical_url: str       # citation URL
-    hub_name: str            # 'Shopping online'
-    topic_name: str          # 'Missing Avios' — canonical / primary topic
+    hub_name: str            # 'Shopping online' (FAQ only — empty for sections/banners)
+    topic_name: str          # 'Missing Avios' — canonical / primary topic (FAQ only)
     additional_topic_names: list[str]  # extra topic blocks this FAQ appears in
     applicable_opcos: list[str]  # the actual opcos this FAQ serves
     last_reviewed_at: str | None
     distance: float          # lower = closer match. >1.0 = mediocre.
+    source_type: str         # 'faq' | 'inspiration_section' | 'banner'
 
 
 # -----------------------------------------------------------------------------
@@ -191,6 +192,7 @@ def retrieve(
             applicable_opcos=opcos,
             last_reviewed_at=meta.get("last_reviewed_at") or None,
             distance=dist,
+            source_type=meta.get("source_type") or "faq",
         ))
     return results
 

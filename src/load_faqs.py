@@ -71,49 +71,54 @@ LOCALES: tuple[str, ...] = ("en-GB", "es-ES")
 @dataclass
 class FaqChunk:
     """
-    One FAQ in one locale, normalised for indexing.
+    One indexable item in one locale, normalised for the vector store.
 
-    The `retrieval_header` is what gets embedded (question + variants +
-    searchSummary). The `body` is the full markdown answer — sent to the
-    model at generation time. Metadata fields drive the query-time hard
-    filter and citation rendering.
+    Despite the legacy class name (FaqChunk), this now represents any
+    retrievable chunk — FAQs, inspirationPageSection entries, and
+    component-banner entries. The `source_type` field distinguishes them.
+
+    The `retrieval_header` is what gets embedded. For FAQs this is
+    question + variants + searchSummary; for sections/banners it's
+    typically heading + body text. The `body` is what gets sent to the
+    model at generation time. Hierarchy fields (hub/topic) are FAQ-only
+    and stay None for non-FAQ sources.
     """
     # Identity
-    chunk_id: str            # `{faq_id}#{locale}` — unique across the corpus
-    faq_id: str              # Contentful sys.id (e.g. faq-im-missing-avios-... )
+    chunk_id: str            # `{source_id}#{locale}` — unique across corpus
+    faq_id: str              # Contentful sys.id (legacy name; really 'source_id')
     internal_name: str       # Editor-facing label
-    slug: str                # URL-safe slug
+    slug: str                # URL-safe slug / identifier
     locale: str              # 'en-GB' | 'es-ES'
 
     # Embedded text + answer body
-    question: str            # Canonical question
-    retrieval_header: str    # question + variants + searchSummary — for embedding
-    body: str                # Markdown answer
+    question: str            # Canonical question (FAQ) or heading (section/banner)
+    retrieval_header: str    # What gets embedded
+    body: str                # Markdown body
 
     # Display + citation
-    short_answer: str        # Polished TL;DR for voice / accordion preview
+    short_answer: str        # Polished TL;DR (FAQ); empty for sections/banners
     canonical_url: str       # Live avios.com URL for citation
 
-    # Hierarchy context
+    # Hierarchy context (FAQ-only — None for sections/banners)
     hub_id: str | None
     hub_name: str | None
     hub_slug: str | None
-    topic_id: str | None              # canonical / primary topic
+    topic_id: str | None
     topic_name: str | None
     topic_slug: str | None
-    # Additional topics (Option C, v4.1.2): a FAQ can surface under multiple
-    # topic blocks during browse without duplicating the entry. RAG stores
-    # these for display only — primary topic still drives chunk metadata.
     additional_topic_ids: list[str] = field(default_factory=list)
     additional_topic_names: list[str] = field(default_factory=list)
 
-    # The load-bearing filter signal — HARD pre-retrieval filter in the
-    # vector store (never re-rank on this). Per v4.1.1 spec.
+    # HARD pre-retrieval filter signal (per v4.1.1 spec)
     applicable_opcos: list[str] = field(default_factory=list)
 
     # Provenance
     last_reviewed_at: str | None = None
     related_faq_ids: list[str] = field(default_factory=list)
+
+    # Source discriminator. Drives source-type badge in the UI + lets us
+    # add per-source-type filtering at query time later if needed.
+    source_type: str = "faq"  # 'faq' | 'inspiration_section' | 'banner'
 
 
 # -----------------------------------------------------------------------------
@@ -229,6 +234,55 @@ def _read_opcos(field: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
     return [o for o in raw if isinstance(o, str) and o in VALID_OPCOS]
+
+
+# -----------------------------------------------------------------------------
+# RichText → markdown flattener
+#
+# component-banner stores bodyCopy as Contentful RichText (a JSON document
+# tree). The restrictions allow: paragraphs, bold + italic marks, unordered
+# lists, and hyperlinks. We flatten to markdown so the same body field
+# matches the markdown shape FAQ + inspirationPageSection use — keeps the
+# retrieval/generation layer simple (no per-source body handling).
+# -----------------------------------------------------------------------------
+
+def _richtext_to_markdown(node: Any) -> str:
+    """Recursive flatten of a Contentful RichText document to markdown."""
+    if not isinstance(node, dict):
+        return ""
+    node_type = node.get("nodeType", "")
+    content = node.get("content", []) or []
+
+    if node_type == "text":
+        value = node.get("value", "") or ""
+        marks = [m.get("type") for m in node.get("marks", []) if isinstance(m, dict)]
+        if "bold" in marks:
+            value = f"**{value}**"
+        if "italic" in marks:
+            value = f"*{value}*"
+        return value
+
+    if node_type == "hyperlink":
+        uri = (node.get("data") or {}).get("uri", "")
+        inner = "".join(_richtext_to_markdown(c) for c in content)
+        return f"[{inner}]({uri})"
+
+    if node_type == "paragraph":
+        return "".join(_richtext_to_markdown(c) for c in content) + "\n\n"
+
+    if node_type == "unordered-list":
+        items = []
+        for li in content:
+            if isinstance(li, dict) and li.get("nodeType") == "list-item":
+                li_text = "".join(_richtext_to_markdown(c) for c in li.get("content", []))
+                items.append(f"- {li_text.strip()}")
+        return "\n".join(items) + "\n\n"
+
+    if node_type == "document":
+        return "".join(_richtext_to_markdown(c) for c in content).strip()
+
+    # Fallback: walk children, append text
+    return "".join(_richtext_to_markdown(c) for c in content)
 
 
 # -----------------------------------------------------------------------------
@@ -400,22 +454,174 @@ def load_faq_chunks() -> list[FaqChunk]:
     return chunks
 
 
+# -----------------------------------------------------------------------------
+# Inspiration sections + component banners — additional source types
+#
+# Same FaqChunk dataclass, source_type distinguishes them. Both treat the
+# entry's heading as the "question" (for retrieval header) and the content
+# body as the chunk body. Hierarchy fields (hub/topic) stay None — these
+# content types live outside the help-centre hierarchy.
+#
+# Citation URLs use parentPageUrl#identifier (sandbox convention; see the
+# migration files for context).
+#
+# Localisation:
+#   - inspirationPageSection: production has all fields non-localised, so
+#     we build one chunk per section (locale=en-GB by convention).
+#   - component-banner: heading + bodyCopy are localised, so we attempt
+#     both en-GB and es-ES chunks (skipping any locale where content is
+#     missing — same pattern as FAQ loader).
+# -----------------------------------------------------------------------------
+
+def load_inspiration_section_chunks() -> list[FaqChunk]:
+    """Fetch inspirationPageSection entries and convert to FaqChunks."""
+    print(f"\nFetching inspirationPageSection from space={SPACE_ID} ...")
+    entries = _fetch_all_entries("inspirationPageSection")
+    print(f"  sections: {len(entries)}")
+    chunks: list[FaqChunk] = []
+    skipped_rag = 0
+    for entry in entries:
+        fields = entry.get("fields", {})
+        eid = entry["sys"]["id"]
+        if not _read_bool(fields.get("ragInclude")):
+            skipped_rag += 1
+            continue
+        opcos = _read_opcos(fields.get("applicableOpcos"))
+        if not opcos:
+            opcos = list(VALID_OPCOS)  # safe default for content lacking the field
+        internal_name = _read_string(fields.get("internalName"), "en-GB")
+        identifier = _read_string(fields.get("identifier"), "en-GB")
+        heading = _read_string(fields.get("heading"), "en-GB")
+        content = _read_string(fields.get("content"), "en-GB")
+        parent_url = _read_string(fields.get("parentPageUrl"), "en-GB") or ""
+
+        # Need at least heading or content to build a useful chunk.
+        if not content:
+            continue
+        # Use heading as the question; if missing, fall back to internalName.
+        title = heading or internal_name or identifier
+
+        # Embedded text: title + content. Heading gives intent, content gives
+        # the substance — same logic as FAQ retrieval header + body.
+        retrieval_header = f"{title}\n\n{content}"
+
+        # Citation URL: parentPageUrl#identifier (production deep-link pattern)
+        if parent_url and identifier:
+            citation_url = f"{parent_url}#{identifier}"
+        elif parent_url:
+            citation_url = parent_url
+        else:
+            citation_url = ""
+
+        chunks.append(FaqChunk(
+            chunk_id=f"{eid}#en-GB",
+            faq_id=eid,
+            internal_name=internal_name or eid,
+            slug=identifier or "",
+            locale="en-GB",
+            question=title,
+            retrieval_header=retrieval_header,
+            body=content,
+            short_answer="",
+            canonical_url=citation_url,
+            hub_id=None, hub_name=None, hub_slug=None,
+            topic_id=None, topic_name=None, topic_slug=None,
+            applicable_opcos=opcos,
+            source_type="inspiration_section",
+        ))
+    print(f"  inspirationPageSection chunks produced: {len(chunks)}  (ragInclude=false skipped: {skipped_rag})")
+    return chunks
+
+
+def load_component_banner_chunks() -> list[FaqChunk]:
+    """Fetch component-banner entries and convert to FaqChunks."""
+    print(f"\nFetching component-banner from space={SPACE_ID} ...")
+    entries = _fetch_all_entries("component-banner")
+    print(f"  banners: {len(entries)}")
+    chunks: list[FaqChunk] = []
+    skipped_rag = 0
+    skipped_missing_locale: dict[str, int] = {loc: 0 for loc in LOCALES}
+    for entry in entries:
+        fields = entry.get("fields", {})
+        eid = entry["sys"]["id"]
+        if not _read_bool(fields.get("ragInclude")):
+            skipped_rag += 1
+            continue
+        opcos = _read_opcos(fields.get("applicableOpcos"))
+        if not opcos:
+            opcos = list(VALID_OPCOS)
+        internal_name = _read_string(fields.get("internalName"), "en-GB")
+        identifier = _read_string(fields.get("identifier"), "en-GB")
+        parent_url = _read_string(fields.get("parentPageUrl"), "en-GB") or ""
+
+        for locale in LOCALES:
+            heading = _read_string(fields.get("heading"), locale)
+            body_richtext = _unwrap_locale(fields.get("bodyCopy"), locale)
+            body_md = _richtext_to_markdown(body_richtext) if body_richtext else ""
+            if not heading and not body_md:
+                skipped_missing_locale[locale] += 1
+                continue
+            title = heading or internal_name or identifier
+            retrieval_header = f"{title}\n\n{body_md}" if body_md else title
+            citation_url = (
+                f"{parent_url}#{identifier}" if parent_url and identifier
+                else (parent_url or "")
+            )
+            chunks.append(FaqChunk(
+                chunk_id=f"{eid}#{locale}",
+                faq_id=eid,
+                internal_name=internal_name or eid,
+                slug=identifier or "",
+                locale=locale,
+                question=title,
+                retrieval_header=retrieval_header,
+                body=body_md,
+                short_answer="",
+                canonical_url=citation_url,
+                hub_id=None, hub_name=None, hub_slug=None,
+                topic_id=None, topic_name=None, topic_slug=None,
+                applicable_opcos=opcos,
+                source_type="banner",
+            ))
+    print(f"  component-banner chunks produced: {len(chunks)}  (ragInclude=false skipped: {skipped_rag})")
+    for loc, n in skipped_missing_locale.items():
+        if n:
+            print(f"    skipped missing {loc} content: {n}")
+    return chunks
+
+
+# -----------------------------------------------------------------------------
+# Combined load — what build_index.py calls
+# -----------------------------------------------------------------------------
+
+def load_all_chunks() -> list[FaqChunk]:
+    """
+    Load every source type into a single chunk list.
+
+    Currently fetches FAQs, inspirationPageSection entries, and
+    component-banner entries. Each becomes one or more chunks with
+    source_type set appropriately. The build_index doesn't need to know
+    the source — it just embeds whatever chunks come back.
+    """
+    all_chunks: list[FaqChunk] = []
+    all_chunks.extend(load_faq_chunks())
+    all_chunks.extend(load_inspiration_section_chunks())
+    all_chunks.extend(load_component_banner_chunks())
+    print(f"\n=== Total chunks: {len(all_chunks)} ===")
+    return all_chunks
+
+
 # Demo entry — useful for quick sanity-check from the CLI
 if __name__ == "__main__":
-    chunks = load_faq_chunks()
+    chunks = load_all_chunks()
     by_locale: dict[str, int] = {}
+    by_source: dict[str, int] = {}
     for c in chunks:
         by_locale[c.locale] = by_locale.get(c.locale, 0) + 1
+        by_source[c.source_type] = by_source.get(c.source_type, 0) + 1
     print("\nPer-locale counts:")
     for loc, n in sorted(by_locale.items()):
         print(f"  {loc}: {n}")
-    if chunks:
-        c = chunks[0]
-        print(f"\nSample chunk:")
-        print(f"  chunk_id:  {c.chunk_id}")
-        print(f"  question:  {c.question}")
-        print(f"  hub:       {c.hub_name}  ({c.hub_slug})")
-        print(f"  topic:     {c.topic_name}  ({c.topic_slug})")
-        print(f"  opcos:     {c.applicable_opcos}")
-        print(f"  url:       {c.canonical_url}")
-        print(f"  retrieval_header: {c.retrieval_header[:100]}...")
+    print("Per-source-type counts:")
+    for src, n in sorted(by_source.items()):
+        print(f"  {src}: {n}")

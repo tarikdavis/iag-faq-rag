@@ -131,7 +131,7 @@ function appendTypingTurn(id) {
   node.id = id;
   node.innerHTML = `<div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
   $convo.appendChild(node);
-  scrollToBottom();
+  scrollLatestIntoView();
 }
 
 function appendErrorTurn(message) {
@@ -139,7 +139,7 @@ function appendErrorTurn(message) {
   node.className = 'turn assistant';
   node.innerHTML = `<div class="bubble error-bubble">${escapeHtml(message)}</div>`;
   $convo.appendChild(node);
-  scrollToBottom();
+  scrollLatestIntoView();
 }
 
 function renderConversation() {
@@ -175,6 +175,7 @@ function renderConversation() {
           <div class="source-id">${escapeHtml(r.internal_name)}</div>
           ${addlLine}
           <div class="source-badges">
+            ${sourceTypeBadge(r.source_type)}
             ${(r.applicable_opcos || []).map(opcoBadge).join('')}
             <span class="badge badge-dist">dist ${r.distance.toFixed(2)}</span>
             ${r.canonical_url ? `<a href="${escapeAttr(r.canonical_url)}" target="_blank" rel="noreferrer">↗ live</a>` : ''}
@@ -211,13 +212,28 @@ function renderConversation() {
   }).join('');
 
   setLoading(false);
-  scrollToBottom();
+  scrollLatestIntoView();
 }
 
-function scrollToBottom() {
-  // Defer so the DOM is fully painted before scrolling
+function scrollLatestIntoView() {
+  // Chat-app pattern: when a new turn arrives, anchor the most recent
+  // user message near the TOP of the viewport (rather than scrolling the
+  // page to its absolute bottom). That way the user's question + the
+  // assistant response rendered below it are both visible in one scroll
+  // position — they don't have to chase content downward as it appears.
+  // Same behaviour as ChatGPT and claude.ai.
+  //
+  // Defer to the next frame so the DOM has painted before we measure.
   requestAnimationFrame(() => {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    const userTurns = $convo.querySelectorAll('.turn.user');
+    const lastUserTurn = userTurns[userTurns.length - 1];
+    if (lastUserTurn) {
+      lastUserTurn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      // No user message yet (e.g. fresh empty state) — fall back to a
+      // true bottom-scroll so any banner/error is visible.
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
   });
 }
 
@@ -229,6 +245,18 @@ function opcoBadge(opco) {
   };
   const [label, cls] = labels[opco] || [opco, 'badge-dist'];
   return `<span class="badge ${cls}" title="${escapeAttr(opco)}">${label}</span>`;
+}
+
+function sourceTypeBadge(sourceType) {
+  // Differentiates FAQ chunks from inspiration sections + component banners in the
+  // retrieved-sources panel. FAQs are the default; only render a badge for the others.
+  if (!sourceType || sourceType === 'faq') return '';
+  const labels = {
+    'inspiration_section': ['Inspiration', '#5f3dc4'],
+    'banner': ['Banner', '#0b7285'],
+  };
+  const [label, color] = labels[sourceType] || [sourceType, '#737177'];
+  return `<span class="badge" style="background:${color}1a;color:${color}" title="${escapeAttr(sourceType)}">${label}</span>`;
 }
 
 /* Minimal markdown — same as before */
@@ -248,8 +276,15 @@ function renderMarkdown(md) {
     const items = block.trim().split(/\n/).map((l) => `<li>${l.replace(/^\d+\.\s+/, '')}</li>`).join('');
     return `<ol>${items}</ol>`;
   });
-  // Preserve paragraph breaks (double newlines → <br><br>, single → <br>)
-  html = html.replace(/\n\n+/g, '<br><br>').replace(/(?<!>)\n(?!<)/g, '<br>');
+  // Preserve paragraph breaks — but DON'T insert <br>s adjacent to block
+  // elements we already rendered (<ul>, <ol>, <h3>, <h4>). Those have their
+  // own margins; stacking <br><br> on top of them creates the gappy look
+  // you see in screenshots when a paragraph leads into a bulleted list.
+  // The lookbehind `(?<!>)` skips if a tag just closed, the lookahead
+  // `(?!<)` skips if a tag is about to open.
+  html = html
+    .replace(/(?<!>)\n\n+(?!<)/g, '<br><br>')
+    .replace(/(?<!>)\n(?!<)/g, '<br>');
   return html;
 }
 
