@@ -42,6 +42,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from src.synthesize_variants import get_variants
+
 
 # -----------------------------------------------------------------------------
 # Configuration
@@ -501,9 +503,20 @@ def load_inspiration_section_chunks() -> list[FaqChunk]:
         # Use heading as the question; if missing, fall back to internalName.
         title = heading or internal_name or identifier
 
-        # Embedded text: title + content. Heading gives intent, content gives
-        # the substance — same logic as FAQ retrieval header + body.
-        retrieval_header = f"{title}\n\n{content}"
+        # Build a question-shaped retrieval header so this section competes
+        # on equal footing with FAQ chunks (which have human-authored variants).
+        # Order matters: heading first, synthesised variants next, then a
+        # SHORT content snippet — keeps the embedding sharp on intent rather
+        # than smeared across the full body. The full body still goes out at
+        # generation time via the `body` field.
+        variants = get_variants(eid, "en-GB", title, content)
+        snippet = " ".join(content.split()[:120])  # ~first 120 words
+        header_parts = [title]
+        if variants:
+            header_parts.extend(variants)
+        if snippet:
+            header_parts.append(snippet)
+        retrieval_header = "\n".join(header_parts)
 
         # Citation URL: parentPageUrl#identifier (production deep-link pattern)
         if parent_url and identifier:
@@ -562,7 +575,18 @@ def load_component_banner_chunks() -> list[FaqChunk]:
                 skipped_missing_locale[locale] += 1
                 continue
             title = heading or internal_name or identifier
-            retrieval_header = f"{title}\n\n{body_md}" if body_md else title
+            # Same variant-synthesis trick as inspiration sections — gives the
+            # banner a tight, intent-shaped embedding to compete with FAQs.
+            # Variants are generated per-locale so Spanish content gets
+            # Spanish variants.
+            variants = get_variants(eid, locale, title, body_md)
+            snippet = " ".join(body_md.split()[:120]) if body_md else ""
+            header_parts = [title]
+            if variants:
+                header_parts.extend(variants)
+            if snippet:
+                header_parts.append(snippet)
+            retrieval_header = "\n".join(header_parts)
             citation_url = (
                 f"{parent_url}#{identifier}" if parent_url and identifier
                 else (parent_url or "")
