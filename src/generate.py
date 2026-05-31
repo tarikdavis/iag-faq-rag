@@ -97,6 +97,15 @@ ANSWERING RULES:
 
 5. Style: neutral, factual, plain language. Short paragraphs. Use markdown lightly (bullet lists OK, no headers). Don't oversell or use marketing language. Don't add sign-offs like "Hope that helps!".
 
+6. After the Sources block, append a "Follow-ups" block listing 2-3 short questions the user might naturally ask next, related to what they just asked. These should be questions the help centre is likely to answer (adjacent topics, common next steps), NOT tangents. Phrase them like real user search-box queries — short, conversational. Format:
+
+   Follow-ups:
+   - <natural follow-up question 1>
+   - <natural follow-up question 2>
+   - <natural follow-up question 3>
+
+If the user explicitly asked for something the context doesn't contain (the total refusal case from rule 3), skip the Follow-ups block.
+
 If the question is in a language the context isn't, answer in the language of the context and add a brief note that you've answered in the original language."""
 
 
@@ -108,6 +117,10 @@ If the question is in a language the context isn't, answer in the language of th
 class GenerationResult:
     answer: str
     cited_sources: list[str] = field(default_factory=list)
+    # Suggested follow-up questions parsed out of the model's trailing
+    # 'Follow-ups:' block. Used by the UI to render clickable chips so
+    # users can keep exploring the corpus without thinking up next queries.
+    suggested_followups: list[str] = field(default_factory=list)
     model: str = MODEL_ID
     input_tokens: int = 0
     output_tokens: int = 0
@@ -216,25 +229,63 @@ def build_user_message(question: str, results: list[RetrievalResult]) -> str:
     )
 
 
-def _strip_sources_block(answer: str) -> str:
+def _strip_trailing_blocks(answer: str) -> str:
     """
-    Remove the trailing 'Sources:' block (and everything after it) from the
+    Remove the trailing 'Sources:' AND/OR 'Follow-ups:' blocks from the
     model's answer before it's sent to the UI.
 
-    Why we strip rather than tell the model not to emit it: we still need
-    _extract_citations to pull IDs out of a Sources block for the audit log.
-    The web UI already shows retrieved sources in the per-turn expander, so
-    duplicating the IDs inline in the answer body is just noise — and noise
-    that distracts reviewers from the actual content they're auditing.
+    Why we strip rather than tell the model not to emit them: we still need
+    _extract_citations + _extract_followups to pull them out for the audit
+    log and the chip UI respectively. The web UI shows retrieved sources in
+    a per-turn expander and follow-ups as clickable chips, so duplicating
+    the raw text inline in the answer body is just noise.
 
-    Strip is intentionally permissive on formatting — the model sometimes
-    emits `Sources:` plain, sometimes `**Sources:**`, sometimes `## Sources`.
+    Pattern matches whichever block appears FIRST and strips from there to
+    end of message — works whether the model emits Sources then Follow-ups,
+    Follow-ups then Sources, or just one of them. Intentionally permissive
+    on formatting (plain `Sources:`, `**Sources:**`, `## Sources`).
     """
     pattern = re.compile(
-        r"\n+\s*(?:#{1,6}\s*)?(?:\*\*\s*)?Sources?\s*:?\s*(?:\*\*)?\s*\n.*$",
+        r"\n+\s*(?:#{1,6}\s*)?(?:\*\*\s*)?(?:Sources?|Follow-?ups?)\s*:?\s*(?:\*\*)?\s*\n.*$",
         re.DOTALL | re.IGNORECASE,
     )
     return pattern.sub("", answer).rstrip()
+
+
+def _extract_followups(answer: str) -> list[str]:
+    """
+    Pull suggested follow-up questions out of the trailing 'Follow-ups:' block.
+
+    Matches the header (with optional bold/heading decoration), then captures
+    bullet items until a blank line or end of message. Returns up to 3 to
+    keep the chip row tidy regardless of how many the model emits.
+    """
+    m = re.search(
+        r"(?:^|\n)\s*(?:#{1,6}\s*)?(?:\*\*\s*)?Follow-?ups?\s*:?\s*(?:\*\*)?\s*\n(.+?)(?:\n\s*\n|$)",
+        answer,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if not m:
+        return []
+    block = m.group(1)
+    # Bullets can be `-`, `*`, or numbered `1.` — accept any
+    items = re.findall(r"^\s*(?:[-*]|\d+\.)\s+(.+?)\s*$", block, re.MULTILINE)
+    cleaned = [s.strip().rstrip("?").rstrip() + "?" for s in items if s.strip()]
+    # Drop the trailing-? trick if the question already ended without one
+    # (e.g. an imperative phrase) — only re-add if it looks like a question
+    cleaned = [_normalise_followup(s) for s in cleaned]
+    return cleaned[:3]
+
+
+def _normalise_followup(s: str) -> str:
+    """Light cleanup: strip wrapping quotes/asterisks and re-jig terminal punctuation."""
+    s = s.strip().strip('"').strip("'").strip("*").strip()
+    # If the model emitted "How do I X?" preserve the ?. If "How do I X" add one.
+    # If "Cancel a flight" (imperative), leave as-is.
+    if not s.endswith(("?", ".", "!")) and any(s.lower().startswith(w + " ") for w in
+        ["how", "what", "when", "where", "why", "can", "do", "does", "is", "are", "will", "should"]):
+        s += "?"
+    return s
 
 
 def _extract_citations(answer: str) -> list[str]:
@@ -272,13 +323,15 @@ def generate(question: str, results: list[RetrievalResult]) -> GenerationResult:
         messages=[{"role": "user", "content": user_message}],
     )
     answer_text = response.content[0].text if response.content else ""
-    # Order matters: extract citations from the raw answer (which still has
-    # the Sources block) BEFORE stripping the block for display.
+    # Order matters: extract from the raw answer (which still has the
+    # Sources + Follow-ups blocks) BEFORE stripping them for display.
     cited = _extract_citations(answer_text)
-    answer_text = _strip_sources_block(answer_text)
+    followups = _extract_followups(answer_text)
+    answer_text = _strip_trailing_blocks(answer_text)
     return GenerationResult(
         answer=answer_text,
         cited_sources=cited,
+        suggested_followups=followups,
         model=MODEL_ID,
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,
@@ -325,10 +378,12 @@ def generate_chat(
     )
     answer_text = response.content[0].text if response.content else ""
     cited = _extract_citations(answer_text)
-    answer_text = _strip_sources_block(answer_text)
+    followups = _extract_followups(answer_text)
+    answer_text = _strip_trailing_blocks(answer_text)
     return GenerationResult(
         answer=answer_text,
         cited_sources=cited,
+        suggested_followups=followups,
         model=MODEL_ID,
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,

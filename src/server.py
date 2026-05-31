@@ -361,11 +361,13 @@ def create_app() -> Flask:
         generation = None
         answer_text = ""
         cited = []
+        suggested_followups: list[str] = []
         if results:
             try:
                 generation = generate_chat(messages, results, retrieval_query, was_rewritten)
                 answer_text = generation.answer
                 cited = generation.cited_sources
+                suggested_followups = generation.suggested_followups
             except Exception as e:
                 return jsonify({"error": f"generation failed: {e}"}), 500
         else:
@@ -391,6 +393,7 @@ def create_app() -> Flask:
         return jsonify({
             "answer": answer_text,
             "cited_sources": cited,
+            "suggested_followups": suggested_followups,
             "retrieval_query": retrieval_query,
             "was_rewritten": was_rewritten,
             "k": k,

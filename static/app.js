@@ -94,6 +94,7 @@ $form.addEventListener('submit', async (e) => {
       retrievalQuery: data.retrieval_query,
       wasRewritten: data.was_rewritten,
       citedSources: data.cited_sources || [],
+      suggestedFollowups: data.suggested_followups || [],
       tokens: data.tokens,
       logPath: data.log_path,
       opco: data.opco,
@@ -116,6 +117,32 @@ $reset.addEventListener('click', () => {
   history = [];
   renderConversation();
   $q.focus();
+});
+
+// Delegated handler for the follow-up + new-topic chips. Delegated because
+// renderConversation rebuilds the chip DOM on every turn — attaching
+// listeners per-chip would mean re-binding on every render.
+$convo.addEventListener('click', (e) => {
+  const followupBtn = e.target.closest('[data-followup]');
+  if (followupBtn) {
+    // Fill the textarea and submit so the chip behaves like the user
+    // typed the question. Preserves the multi-turn context (the prior
+    // exchange feeds into query rewriting).
+    $q.value = followupBtn.dataset.followup;
+    $form.requestSubmit();
+    return;
+  }
+  const newTopicBtn = e.target.closest('.new-topic-chip');
+  if (newTopicBtn) {
+    // No confirm dialog here — "switch topic" is a deliberate user
+    // action with a fresh question almost certainly coming next, not
+    // an accidental destructive click. The header Reset button keeps
+    // its confirm dialog for the explicit "clear everything" case.
+    history = [];
+    renderConversation();
+    $q.focus();
+    return;
+  }
 });
 
 function setLoading(loading) {
@@ -203,9 +230,24 @@ function renderConversation() {
         </details>
       `;
     }
+    // Follow-up chips: 2-3 model-suggested next questions + an "ask about
+    // something else" reset. The follow-up chips submit on click; the reset
+    // clears history without the destructive-action confirm dialog the
+    // header Reset button shows, because "switch topic" is a different
+    // intent from "destroy everything".
+    let followupChipsHtml = '';
+    const fups = t.suggestedFollowups || [];
+    if (fups.length || t.content) {
+      const followupBtns = fups.map((f) =>
+        `<button type="button" class="followup-chip" data-followup="${escapeAttr(f)}">${escapeHtml(f)}</button>`
+      ).join('');
+      const resetBtn = `<button type="button" class="followup-chip new-topic-chip">↻ Ask about something else</button>`;
+      followupChipsHtml = `<div class="followup-chips">${followupBtns}${resetBtn}</div>`;
+    }
     return `
       <div>
         <div class="turn assistant"><div class="bubble">${renderMarkdown(t.content)}</div></div>
+        ${followupChipsHtml}
         <div class="turn-meta" style="justify-content:flex-start; margin-left:4px">${sourcesHtml}</div>
       </div>
     `;

@@ -107,6 +107,35 @@
       .bubble code { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; background: var(--bg-layer3); padding: 1px 4px; border-radius: 3px; }
       .bubble p { margin: 6px 0; }
 
+      /* Follow-up + new-topic chips below each assistant response.
+         Visually subordinate to the answer (smaller, lighter) so the eye
+         lands on the response first and the chips read as "what next?"
+         affordances rather than primary actions. */
+      .followup-chips {
+        display: flex; flex-wrap: wrap; gap: 6px;
+        margin: 8px 0 4px 4px;
+      }
+      .followup-chip {
+        font-family: inherit; font-size: 12px; line-height: 1.3;
+        background: var(--bg-card); color: var(--fg-secondary);
+        border: 1px solid var(--border-tertiary); border-radius: 9999px;
+        padding: 5px 12px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+        text-align: left;
+      }
+      .followup-chip:hover {
+        background: var(--accent-subtle); color: var(--accent);
+        border-color: var(--accent);
+      }
+      .followup-chip.new-topic-chip {
+        color: var(--fg-tertiary);
+        border-style: dashed;
+      }
+      .followup-chip.new-topic-chip:hover {
+        color: var(--fg-secondary); background: var(--bg-layer3);
+        border-color: var(--fg-tertiary); border-style: solid;
+      }
+
       .turn-meta {
         font-size: 11px; color: var(--fg-tertiary);
         margin-top: 4px; padding-left: 4px;
