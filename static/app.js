@@ -119,10 +119,19 @@ $reset.addEventListener('click', () => {
   $q.focus();
 });
 
-// Delegated handler for the follow-up + new-topic chips. Delegated because
-// renderConversation rebuilds the chip DOM on every turn — attaching
-// listeners per-chip would mean re-binding on every render.
+// Delegated handler for the copy, follow-up, and new-topic chips. Delegated
+// because renderConversation rebuilds the chip DOM on every turn —
+// attaching listeners per-chip would mean re-binding on every render.
 $convo.addEventListener('click', (e) => {
+  const copyBtn = e.target.closest('.copy-answer-btn');
+  if (copyBtn) {
+    const idx = parseInt(copyBtn.dataset.turnIndex, 10);
+    const turn = history[idx];
+    if (turn && turn.content) {
+      copyAnswerToClipboard(turn.content, copyBtn);
+    }
+    return;
+  }
   const followupBtn = e.target.closest('[data-followup]');
   if (followupBtn) {
     // Fill the textarea and submit so the chip behaves like the user
@@ -144,6 +153,69 @@ $convo.addEventListener('click', (e) => {
     return;
   }
 });
+
+// -----------------------------------------------------------------------
+// Copy-to-clipboard helpers
+//
+// QA workflow: response → Excel cell. Excel pastes plain text into one
+// cell with line breaks preserved. Markdown markers (** _ - [ ]) would
+// be ugly noise in a spreadsheet, so we strip them. Links keep their
+// URL in parentheses so QA can click through if needed.
+// -----------------------------------------------------------------------
+
+function markdownToPlainText(md) {
+  let s = String(md || '');
+  // Links: [text](url) → "text (url)"
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
+  // Bold + italic — strip the markers
+  s = s.replace(/\*\*([^*]+)\*\*/g, '$1');
+  s = s.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1');
+  // Headers — strip leading hashes, keep the text
+  s = s.replace(/^#{1,6}\s+/gm, '');
+  // Bullets — convert `- foo` to `• foo` (renders cleanly in Excel)
+  s = s.replace(/^[-*]\s+/gm, '• ');
+  // Inline code — strip backticks
+  s = s.replace(/`([^`]+)`/g, '$1');
+  return s.trim();
+}
+
+function copyAnswerToClipboard(markdownText, btn) {
+  const plain = markdownToPlainText(markdownText);
+  // navigator.clipboard requires a secure context (https or localhost).
+  // The fallback path handles file:// or older browsers — rare for this
+  // app but worth keeping the QA workflow working.
+  const writePromise = navigator.clipboard && navigator.clipboard.writeText
+    ? navigator.clipboard.writeText(plain)
+    : new Promise((resolve, reject) => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = plain;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          resolve();
+        } catch (err) { reject(err); }
+      });
+
+  writePromise.then(() => flashCopiedFeedback(btn))
+              .catch((err) => console.error('Copy failed:', err));
+}
+
+function flashCopiedFeedback(btn) {
+  const originalHtml = btn.innerHTML;
+  const originalTitle = btn.getAttribute('title');
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+  btn.setAttribute('title', 'Copied!');
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.innerHTML = originalHtml;
+    btn.setAttribute('title', originalTitle || 'Copy response to clipboard');
+    btn.classList.remove('copied');
+  }, 1500);
+}
 
 function setLoading(loading) {
   $send.disabled = loading;
@@ -184,7 +256,7 @@ function renderConversation() {
     return;
   }
 
-  $convo.innerHTML = history.map((t) => {
+  $convo.innerHTML = history.map((t, i) => {
     if (t.role === 'user') {
       return `<div class="turn user"><div class="bubble">${escapeHtml(t.content)}</div></div>`;
     }
@@ -230,19 +302,21 @@ function renderConversation() {
         </details>
       `;
     }
-    // Follow-up chips: 2-3 model-suggested next questions + an "ask about
-    // something else" reset. The follow-up chips submit on click; the reset
-    // clears history without the destructive-action confirm dialog the
-    // header Reset button shows, because "switch topic" is a different
-    // intent from "destroy everything".
+    // Action row below the bubble: copy button + follow-up chips + new-topic.
+    // Copy is leftmost (icon-only) because it's a meta action on this turn;
+    // follow-ups continue the conversation; new-topic clears it. Visually
+    // grouped, semantically distinct.
     let followupChipsHtml = '';
     const fups = t.suggestedFollowups || [];
-    if (fups.length || t.content) {
+    if (t.content) {
+      const copyBtn = `<button type="button" class="copy-answer-btn" data-turn-index="${i}" title="Copy response to clipboard" aria-label="Copy response to clipboard">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>`;
       const followupBtns = fups.map((f) =>
         `<button type="button" class="followup-chip" data-followup="${escapeAttr(f)}">${escapeHtml(f)}</button>`
       ).join('');
       const resetBtn = `<button type="button" class="followup-chip new-topic-chip">↻ Ask about something else</button>`;
-      followupChipsHtml = `<div class="followup-chips">${followupBtns}${resetBtn}</div>`;
+      followupChipsHtml = `<div class="followup-chips">${copyBtn}${followupBtns}${resetBtn}</div>`;
     }
     return `
       <div>
